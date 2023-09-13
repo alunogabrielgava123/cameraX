@@ -1,6 +1,7 @@
 @file:Suppress("IMPLICIT_CAST_TO_ANY")
 
 import android.content.Context
+import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,14 +31,17 @@ import androidx.compose.material.icons.sharp.ArrowBackIosNew
 import androidx.compose.material.icons.sharp.Check
 import androidx.compose.material.icons.sharp.MoreHoriz
 import androidx.compose.material.icons.sharp.SaveAlt
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +62,7 @@ import coil.compose.rememberImagePainter
 import com.example.camerax.CameraViewModel
 import com.example.camerax.EventUi
 
+
 @Composable
 fun ImagePreview(
     cameraViewModel : CameraViewModel = viewModel()
@@ -66,10 +71,14 @@ fun ImagePreview(
     val uiState = cameraViewModel.uiState.collectAsState().value
     var expanded by remember { mutableStateOf(false) }
 
+
+
     val context = LocalContext.current
 
     val scale = remember { mutableStateOf(0.92f) }
     val rotationState = remember { mutableStateOf(0.92f) }
+
+
 
 
     Column {
@@ -82,86 +91,6 @@ fun ImagePreview(
                     .padding(0.dp)
 
             ) {
-
-            IconButton(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .align(Alignment.TopStart),
-                onClick = {
-                    cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
-                }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color.DarkGray, CircleShape)
-                        .padding(4.dp)
-                ){
-                    Icon(
-                        imageVector = Icons.Sharp.ArrowBackIosNew,
-                        contentDescription = "Take picture",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-
-                    )
-                }
-            }
-
-                IconButton(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .align(Alignment.TopEnd),
-                    onClick = {
-
-                        expanded = true
-                    }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(Color.DarkGray, CircleShape)
-                            .padding(4.dp)
-                    ){
-
-                        Icon(
-                            imageVector = Icons.Sharp.MoreHoriz,
-                            contentDescription = "Take picture",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(32.dp)
-
-                        )
-
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Salvar") },
-                                onClick = {
-                                    cameraViewModel.saveImageMidiaStorage("imagem", context = context, 10f)
-                                    expanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Outlined.SaveAlt,
-                                        contentDescription = null
-                                    )
-                                })
-                            DropdownMenuItem(
-                                text = { Text("Desenhar") },
-                                onClick = {
-                                    expanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Outlined.Draw,
-                                        contentDescription = null
-                                    )
-                                })
-                        }
-                    }
-                }
-
 
 
 
@@ -200,7 +129,6 @@ fun ImagePreview(
                     )
             }
 
-
                Image(
                    painter = rememberImagePainter(uiState.uri),
                    contentDescription = null,
@@ -210,16 +138,83 @@ fun ImagePreview(
 
                )
 
-                if(uiState.salvingDadosStorage) {
+                IconButton(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.TopStart),
+                    onClick = {
+                        cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
+                    }
+                ) {
                     Box(
                         modifier = Modifier
-                            .background(Color.Black, RoundedCornerShape(8.dp))
-                            .padding(16.dp)
-                            .align(Alignment.Center)  // Centraliza o CircularProgressIndicator
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color.White
+                            .background(Color.DarkGray, CircleShape)
+                            .padding(4.dp)
+                    ){
+                        Icon(
+                            imageVector = Icons.Sharp.ArrowBackIosNew,
+                            contentDescription = "Take picture",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(32.dp)
+
                         )
+                    }
+                }
+
+                IconButton(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.TopEnd),
+                    onClick = {
+
+                        expanded = true
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color.DarkGray, CircleShape)
+                            .padding(4.dp)
+                    ){
+
+                        Icon(
+                            imageVector = Icons.Sharp.MoreHoriz,
+                            contentDescription = "Take picture",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(32.dp)
+
+                        )
+
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Salvar") },
+                                onClick = {
+                                    cameraViewModel.saveImageMidiaStorage("imagem", context = context, 10f)
+                                    expanded = false
+                                    Toast.makeText(context, "Imagem salva com sucesso!", Toast.LENGTH_SHORT).show()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.SaveAlt,
+                                        contentDescription = null
+                                    )
+                                })
+                            DropdownMenuItem(
+                                text = { Text("Desenhar") },
+                                onClick = {
+                                    expanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Outlined.Draw,
+                                        contentDescription = null
+                                    )
+                                })
+                        }
                     }
                 }
 
@@ -286,7 +281,9 @@ fun ImagePreview(
                         }
                     }
 
+
             }
+
         }
     }
 }

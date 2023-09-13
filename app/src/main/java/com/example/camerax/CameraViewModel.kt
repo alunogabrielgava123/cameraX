@@ -3,8 +3,10 @@ package com.example.camerax
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -12,24 +14,21 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.time.Duration
 
 class CameraViewModel : ViewModel() {
 
     val initState = CameraViewUiState(
         null,
         null,
-        false,
         isFront = CameraSelector.DEFAULT_BACK_CAMERA,
         isFlash = false,
         listOf(
@@ -61,42 +60,46 @@ class CameraViewModel : ViewModel() {
     val uiState : StateFlow<CameraViewUiState> = _uiState.asStateFlow()
 
 
-
-
     fun saveImageMidiaStorage(title: String, context: Context , scaleFactor: Float) {
-
-        _uiState.update {
-            it -> it.copy(
-                salvingDadosStorage = true
-            )
-        }
-
         viewModelScope.launch {
-
-            delay(3000)
-
             try {
 
                 if(_uiState.value.uri != null) {
                     val bitmap = getBitmapFromUri(_uiState.value.uri!!, context)!!
 
-                    val dessespelhada = flipHorizontal(bitmap)
+                    //filtrando o elemente que esta selecionado
+                    val filtro : Filtro? = _uiState.value.filtros.find { it.isSelct }
 
-                    saveBitmapToGallery(context, dessespelhada, title)
+                    if(_uiState.value.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                        val dessespelhada = flipHorizontal(bitmap)
+                        Log.i("filtro", "${filtro}")
+                        saveBitmapToGallery(context, dessespelhada, title)
+                    } else {
+                        Log.i("filtro", "${filtro}")
+                        saveBitmapToGallery(context, bitmap, title)
+                    }
                 }
-
+                //emitindo o evento para salvar a imagem no storage do dispositivo
 
             }catch (e : Error) {
-                Log.i("kilo", e.toString())
-            } finally {
-                _uiState.update {
-                        it -> it.copy(
-                    salvingDadosStorage = false
-                    )
-                }
+                //emitindo o evento para salvar a imagem no storago porem o erro
+                Log.i("kilo", "Erro ao salvar imagem ${e.message}")
             }
         }
     }
+
+//    fun filterBitmap(input: Bitmap, composeFilter: ColorFilter?): Bitmap {
+//        val output = Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888)
+//        val canvas = Canvas(output)
+//        val paint = Paint().apply {
+//            colorFilter = composeFilter?.asAndroidColorFilter()
+//        }
+//        canvas.drawBitmap(input, 0f, 0f, paint)
+//        return output
+//    }
+
+
+
 
     fun flipHorizontal(bitmap: Bitmap): Bitmap {
         val matrix = Matrix()
@@ -140,8 +143,12 @@ class CameraViewModel : ViewModel() {
                EventUi.DeletandoFoto -> deleteImage()
             is  EventUi.TrocandoCamera -> setCamera()
                EventUi.AtivandoFlesh -> setFlash(value = !_uiState.value.isFlash)
+
         }
     }
+
+
+
     
     private fun setCamera() {
 
@@ -177,6 +184,9 @@ class CameraViewModel : ViewModel() {
             MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
         }
     }
+
+
+
 
 
     fun selectFiltro(selectedFiltro: Filtro) {
@@ -229,7 +239,6 @@ class CameraViewModel : ViewModel() {
 data class CameraViewUiState(
     val uri: Uri?,
     val filtro: Filtro?,
-    val salvingDadosStorage : Boolean,
     val isFront: CameraSelector,
     val isFlash: Boolean,
     val filtros: List<Filtro>
@@ -242,8 +251,11 @@ data class Filtro(
 )
 
 
+
+
 sealed class EventUi {
     data class TirandoFoto( val uri : Uri ) : EventUi()
+
     object TrocandoCamera : EventUi()
     object AtivandoFlesh: EventUi()
     object DeletandoFoto :EventUi()
