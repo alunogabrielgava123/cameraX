@@ -88,16 +88,6 @@ class CameraViewModel : ViewModel() {
         }
     }
 
-//    fun filterBitmap(input: Bitmap, composeFilter: ColorFilter?): Bitmap {
-//        val output = Bitmap.createBitmap(input.width, input.height, Bitmap.Config.ARGB_8888)
-//        val canvas = Canvas(output)
-//        val paint = Paint().apply {
-//            colorFilter = composeFilter?.asAndroidColorFilter()
-//        }
-//        canvas.drawBitmap(input, 0f, 0f, paint)
-//        return output
-//    }
-
 
 
 

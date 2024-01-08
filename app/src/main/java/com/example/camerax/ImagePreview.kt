@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.sharp.Send
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Draw
 import androidx.compose.material.icons.outlined.Edit
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.sharp.ArrowBackIosNew
 import androidx.compose.material.icons.sharp.Check
 import androidx.compose.material.icons.sharp.MoreHoriz
 import androidx.compose.material.icons.sharp.SaveAlt
+import androidx.compose.material.icons.sharp.Send
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
@@ -38,6 +40,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,12 +75,10 @@ fun ImagePreview(
     var expanded by remember { mutableStateOf(false) }
 
 
-
     val context = LocalContext.current
 
     val scale = remember { mutableStateOf(0.92f) }
     val rotationState = remember { mutableStateOf(0.92f) }
-
 
 
 
@@ -96,37 +97,15 @@ fun ImagePreview(
 
             val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
                 Modifier
+                    .padding(3.dp)
                     .fillMaxHeight(fraction = 0.92f)
                     .align(Alignment.BottomCenter)
                     .graphicsLayer(scaleX = -1f)
-                    .pointerInput(Unit) {
-                        detectTransformGestures { centroid, pan, zoom, rotation ->
-                            scale.value *= zoom
-                            rotationState.value += rotation
-                        }
-                    }
-                    .graphicsLayer(
-                        // adding some zoom limits (min 50%, max 200%)
-                        scaleX = maxOf(.5f, minOf(3f, scale.value)),
-                        scaleY = maxOf(.5f, minOf(3f, scale.value)),
-                        rotationZ = rotationState.value
-                    )
             } else {
                 Modifier
+                    .padding(3.dp)
                     .fillMaxHeight(fraction = 0.92f)
                     .align(Alignment.BottomCenter)
-                    .pointerInput(Unit) {
-                        detectTransformGestures { centroid, pan, zoom, rotation ->
-                            scale.value *= zoom
-                            rotationState.value += rotation
-                        }
-                    }
-                    .graphicsLayer(
-                        // adding some zoom limits (min 50%, max 200%)
-                        scaleX = maxOf(.5f, minOf(3f, scale.value)),
-                        scaleY = maxOf(.5f, minOf(3f, scale.value)),
-                        rotationZ = rotationState.value
-                    )
             }
 
                Image(
@@ -218,70 +197,25 @@ fun ImagePreview(
                     }
                 }
 
-
-                Row(
+                Box(
                     modifier = Modifier
                         .background(Color.Black)
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(fraction = 0.15f)
+                        .fillMaxHeight(fraction = 0.08f)
                 ) {
-                    val scrollState = rememberScrollState()
+                    Row( modifier = Modifier.align(Alignment.BottomEnd)  ) {
+                        IconButton( onClick = { /*TODO*/ },) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Sharp.Send,
+                                contentDescription = "Take picture",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(32.dp)
 
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(scrollState)
-                    ) {
-                        // Adicionando várias imagens na linha
-                        repeat(uiState.filtros.size) { index ->  // Supondo que você tenha 10 imagens
-
-                            val filtro = uiState.filtros[index]
-
-                            val modifier = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA)  {
-                                val modifier = Modifier// Recorte arredondado para a imagem
-                                    .fillMaxSize()
-                                    .size(100.dp, 100.dp)
-                                    .graphicsLayer(scaleX = -1f)
-                                    .clickable {
-                                        cameraViewModel.selectFiltro(filtro)
-                                    }
-                                    .padding(8.dp)
-                                    .border(
-                                        1.dp, if (filtro.isSelct) {
-                                            Color.Gray
-                                        } else {
-                                            Color.Transparent
-                                        }
-                                    )
-                                modifier
-                            } else {
-                                val modifier = Modifier// Recorte arredondado para a imagem
-                                    .fillMaxSize()
-                                    .size(100.dp, 100.dp)
-                                    .clickable {
-                                        cameraViewModel.selectFiltro(filtro)
-                                    }
-                                    .padding(8.dp)
-                                    .border(
-                                        1.dp, if (filtro.isSelct) {
-                                            Color.Gray
-                                        } else {
-                                            Color.Transparent
-                                        }
-                                    )
-                                modifier
-                            }
-
-                            Image(
-                                contentScale = ContentScale.Crop,
-                                painter = rememberImagePainter(uiState.uri),
-                                contentDescription = null,
-                                colorFilter = filtro.filtroColor,
-                                modifier = modifier)
+                            )
                         }
                     }
-
-
             }
 
         }
