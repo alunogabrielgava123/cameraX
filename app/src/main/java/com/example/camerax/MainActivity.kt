@@ -103,16 +103,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setContent {
-            CameraScream(outputDirectory = outputDirectory, executor = cameraExecutor)
-        }
-
         requestPermissions()
 
         outputDirectory = getOutputDirectory()
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        setContent {
+            CameraScream(outputDirectory = outputDirectory, executor = cameraExecutor)
+        }
+
     }
+
 
     //request permision
     private val requestPermissionLauncher = registerForActivityResult(

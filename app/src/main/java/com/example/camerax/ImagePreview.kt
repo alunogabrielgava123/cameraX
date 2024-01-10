@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.outlined.SaveAlt
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.sharp.ArrowBackIosNew
 import androidx.compose.material.icons.sharp.Check
+import androidx.compose.material.icons.sharp.Clear
 import androidx.compose.material.icons.sharp.MoreHoriz
 import androidx.compose.material.icons.sharp.SaveAlt
 import androidx.compose.material.icons.sharp.Send
@@ -65,8 +67,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberImagePainter
 import com.example.camerax.CameraViewModel
+import com.example.camerax.CameraViewUiState
 import com.example.camerax.EventUi
 import com.example.camerax.TypeErrorIsBlackOurWhite
+import com.example.camerax.TypeModel
 
 
 @Composable
@@ -77,199 +81,641 @@ fun ImagePreview(
     val uiState = cameraViewModel.uiState.collectAsState().value
     val isLoading = cameraViewModel.isLoading.collectAsState().value
     var expanded by remember { mutableStateOf(false) }
-
+    val imagePreview = cameraViewModel.previewImage.collectAsState().value
 
     val context = LocalContext.current
 
     var scale by remember { mutableStateOf(1f) }
 
-
-
-
-    Column {
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(fraction = 1f)
-                    .background(Color.Black)
-                    .padding(0.dp)
-
-            ) {
-
-
-
-            val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
-                Modifier
-                    .padding(0.dp)
-                    .fillMaxHeight(fraction = 1f)
-                    .align(Alignment.BottomCenter)
-                    .graphicsLayer(
-                        // Aplica o zoom
-                        scaleX = maxOf(1f, scale),
-                        scaleY = maxOf(1f, scale)
-                    )
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoom, _ ->
-                            scale *= zoom
-                        }
-                    }
-            } else {
-                Modifier
-                    .padding(0.dp)
-                    .fillMaxHeight(fraction = 1f)
-                    .align(Alignment.BottomCenter)
-                    .graphicsLayer(
-                        // Aplica o zoom
-                        scaleX = maxOf(1f, scale),
-                        scaleY = maxOf(1f, scale)
-                    )
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoom, _ ->
-                            scale *= zoom
-                        }
-                    }
-            }
-
-               Image(
-                   painter = rememberImagePainter(uiState.uri),
-                   contentDescription = null,
-                   modifier = modifer,
-                   contentScale = ContentScale.Crop,
-
-               )
-
-                IconButton(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .align(Alignment.TopStart),
-                    onClick = {
-                        cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
-                    }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(Color.DarkGray, CircleShape)
-                            .padding(4.dp)
-                    ){
-                        Icon(
-                            imageVector = Icons.Sharp.ArrowBackIosNew,
-                            contentDescription = "Take picture",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(32.dp)
-
-                        )
-                    }
-                }
-
-                IconButton(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .align(Alignment.TopEnd),
-                    onClick = {
-                        expanded = true
-                    }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(Color.DarkGray, CircleShape)
-                            .padding(4.dp)
-                    ){
-
-                        Icon(
-                            imageVector = Icons.Sharp.MoreHoriz,
-                            contentDescription = "Take picture",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(32.dp)
-
-                        )
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Salvar") },
-                                onClick = {
-                                  expanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Outlined.SaveAlt,
-                                        contentDescription = null
-                                    )
-                                })
-                            DropdownMenuItem(
-                                text = { Text("Desenhar") },
-                                onClick = {
-                                    expanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Outlined.Draw,
-                                        contentDescription = null
-                                    )
-                                })
-                        }
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .background(Color.Black)
-                        .fillMaxWidth()
-                        .align(Alignment.BottomEnd)
-                        .padding(horizontal = 8.dp)
-                        .fillMaxHeight(fraction = 0.08f)
-                ) {
-                    Row(modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight()) {
+                when (imagePreview.typeModel) {
+                    TypeModel.START -> Column {
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp)
-                                .fillMaxHeight()
+                                .background(Color.Black)
+                                .fillMaxWidth()
+                                .fillMaxHeight(fraction = 1f)
                         ) {
 
-                            if(isLoading) {
-                                Box(  modifier = Modifier.height(30.dp).width(30.dp).align(Alignment.CenterStart) ) {
-                                    CircularProgressIndicator()
-                                }
-                            } else {
-                                if(uiState.error == null) {
-                                    Text("Estou esperando voce aqui", color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
-                                } else {
-                                    Text(uiState.error.message, color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
-                                }
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(end = 8.dp)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(fraction = 1f)
+                                    .background(Color.Black)
+                                    .padding(0.dp)
 
-                        ) {
-                            IconButton(
-                                modifier = Modifier.align(Alignment.CenterEnd),
-                                onClick = {
-                                    uiState.uri?.let {
-                                        cameraViewModel.sendAndCalculateImage(context, it, scale)
+                            ) {
+                                //Inicio da top bar
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopStart),
+                                    onClick = {
+                                        cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+                                        Icon(
+                                            imageVector = Icons.Sharp.ArrowBackIosNew,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
                                     }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Sharp.Send,
-                                    contentDescription = "Enviar",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
+
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopEnd),
+                                    onClick = {
+                                        expanded = true
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+
+                                        Icon(
+                                            imageVector = Icons.Sharp.MoreHoriz,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Salvar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.SaveAlt,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                            DropdownMenuItem(
+                                                text = { Text("Desenhar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.Draw,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                        }
+                                    }
+                                }
+
+                            //inicio da imagem
+                            val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                                Modifier
+                                    .padding(0.dp)
+                                    .fillMaxHeight(fraction = 0.90f)
+                                    .align(Alignment.BottomCenter)
+                                    .graphicsLayer(
+                                        // Aplica o zoom
+                                        scaleX = maxOf(1f, scale),
+                                        scaleY = maxOf(1f, scale)
+                                    )
+                                    .pointerInput(Unit) {
+                                        detectTransformGestures { _, _, zoom, _ ->
+                                            scale *= zoom
+                                        }
+                                    }
+                            } else {
+                                Modifier
+                                    .padding(0.dp)
+                                    .fillMaxHeight(fraction = 0.90f)
+                                    .align(Alignment.BottomCenter)
+                                    .graphicsLayer(
+                                        // Aplica o zoom
+                                        scaleX = maxOf(1f, scale),
+                                        scaleY = maxOf(1f, scale)
+                                    )
+                                    .pointerInput(Unit) {
+                                        detectTransformGestures { _, _, zoom, _ ->
+                                            scale *= zoom
+                                        }
+                                    }
+                            }
+
+                            Image(
+                                painter = rememberImagePainter(uiState.uri),
+                                contentDescription = null,
+                                modifier = modifer,
+                                contentScale = ContentScale.Crop,
+
                                 )
+
+                                Box(  modifier = Modifier
+                                    .background(Color.Black)
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomEnd)
+                                    .padding(horizontal = 8.dp)
+                                    .fillMaxHeight(fraction = 0.10f) ) {
+                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
+                                        uiState.uri?.let {
+                                            cameraViewModel.handlerEventCameraView(EventUi.ChangeStart(TypeModel.CLASSIFICATION))
+                                        }
+                                    }
+                                }
+                        }
+                        }
+                    }
+                    TypeModel.CLASSIFICATION ->  Column {
+                     Box(
+                         modifier = Modifier
+                             .background(Color.Black)
+                             .fillMaxWidth()
+                             .fillMaxHeight(fraction = 1f)
+                     ) {
+
+                         Box(
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .fillMaxHeight(fraction = 1f)
+                                 .background(Color.Black)
+                                 .padding(0.dp)
+                                 .align(Alignment.TopCenter)
+                         ) {
+                             //Inicio da top bar
+                             IconButton(
+                                 modifier = Modifier
+                                     .padding(12.dp)
+                                     .align(Alignment.TopStart),
+                                 onClick = {
+                                     cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
+                                 }
+                             ) {
+                                 Box(
+                                     modifier = Modifier
+                                         .background(Color.DarkGray, CircleShape)
+                                         .padding(4.dp)
+                                 ){
+                                     Icon(
+                                         imageVector = Icons.Sharp.ArrowBackIosNew,
+                                         contentDescription = "Take picture",
+                                         tint = Color.White,
+                                         modifier = Modifier
+                                             .size(32.dp)
+
+                                     )
+                                 }
+                             }
+
+                             IconButton(
+                                 modifier = Modifier
+                                     .padding(12.dp)
+                                     .align(Alignment.TopEnd),
+                                 onClick = {
+                                     cameraViewModel.handlerEventCameraView(EventUi.ChangeStart( typeModel = TypeModel.START ))
+                                 }
+                             ) {
+                                 Box(
+                                     modifier = Modifier
+                                         .background(Color.DarkGray, CircleShape)
+                                         .padding(4.dp)
+                                 ){
+
+                                     Icon(
+                                         imageVector = Icons.Sharp.Clear,
+                                         contentDescription = "Take picture",
+                                         tint = Color.White,
+                                         modifier = Modifier
+                                             .size(32.dp)
+
+                                     )
+                                 }
+                             }
+
+                             //inicio da imagem
+                             val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                                 Modifier
+                                     .padding(0.dp)
+                                     .fillMaxHeight(fraction = 0.90f)
+                                     .align(Alignment.BottomCenter)
+                                     .graphicsLayer(
+                                         // Aplica o zoom
+                                         scaleX = maxOf(1f, scale),
+                                         scaleY = maxOf(1f, scale)
+                                     )
+                                     .pointerInput(Unit) {
+                                         detectTransformGestures { _, _, zoom, _ ->
+                                             scale *= zoom
+                                         }
+                                     }
+                             } else {
+                                 Modifier
+                                     .padding(0.dp)
+                                     .fillMaxHeight(fraction = 0.90f)
+                                     .align(Alignment.BottomCenter)
+                                     .graphicsLayer(
+                                         // Aplica o zoom
+                                         scaleX = maxOf(1f, scale),
+                                         scaleY = maxOf(1f, scale)
+                                     )
+                                     .pointerInput(Unit) {
+                                         detectTransformGestures { _, _, zoom, _ ->
+                                             scale *= zoom
+                                         }
+                                     }
+                             }
+
+                             Image(
+                                 painter = rememberImagePainter(uiState.uri),
+                                 contentDescription = null,
+                                 modifier = modifer,
+                                 contentScale = ContentScale.Crop,
+
+                                 )
+
+                             Box(  modifier = Modifier
+                                 .background(Color.Black)
+                                 .fillMaxWidth()
+                                 .align(Alignment.BottomEnd)
+                                 .padding(horizontal = 8.dp)
+                                 .fillMaxHeight(fraction = 0.30f) )
+                             {
+                                 Box(modifier = Modifier.fillMaxWidth(0.4f).fillMaxHeight().padding(8.dp).align(alignment = Alignment.CenterStart)) {
+                                     Column {
+                                         imagePreview.classification?.score?.forEach {
+                                                 choice -> Row(
+                                                modifier = Modifier.background(Color.Red)
+                                         ) {
+                                             Text(choice.nome, color =Color.White)
+                                             Text("${choice.rating * 100}%", color = Color.White)
+                                         }
+                                         }
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 }
+                    TypeModel.DETECTION -> Column {
+                        Box(
+                            modifier = Modifier
+                                .background(Color.Black)
+                                .fillMaxWidth()
+                                .fillMaxHeight(fraction = 1f)
+                        ) {
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(fraction = 1f)
+                                    .background(Color.Black)
+                                    .padding(0.dp)
+
+                            ) {
+                                //Inicio da top bar
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopStart),
+                                    onClick = {
+                                        cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+                                        Icon(
+                                            imageVector = Icons.Sharp.ArrowBackIosNew,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopEnd),
+                                    onClick = {
+                                        expanded = true
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+
+                                        Icon(
+                                            imageVector = Icons.Sharp.MoreHoriz,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Salvar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.SaveAlt,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                            DropdownMenuItem(
+                                                text = { Text("Desenhar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.Draw,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                        }
+                                    }
+                                }
+
+                                //inicio da imagem
+                                val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                                    Modifier
+                                        .padding(0.dp)
+                                        .fillMaxHeight(fraction = 0.90f)
+                                        .align(Alignment.BottomCenter)
+                                        .graphicsLayer(
+                                            // Aplica o zoom
+                                            scaleX = maxOf(1f, scale),
+                                            scaleY = maxOf(1f, scale)
+                                        )
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, _, zoom, _ ->
+                                                scale *= zoom
+                                            }
+                                        }
+                                } else {
+                                    Modifier
+                                        .padding(0.dp)
+                                        .fillMaxHeight(fraction = 0.90f)
+                                        .align(Alignment.BottomCenter)
+                                        .graphicsLayer(
+                                            // Aplica o zoom
+                                            scaleX = maxOf(1f, scale),
+                                            scaleY = maxOf(1f, scale)
+                                        )
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, _, zoom, _ ->
+                                                scale *= zoom
+                                            }
+                                        }
+                                }
+
+                                Image(
+                                    painter = rememberImagePainter(uiState.uri),
+                                    contentDescription = null,
+                                    modifier = modifer,
+                                    contentScale = ContentScale.Crop,
+
+                                    )
+
+                                Box(  modifier = Modifier
+                                    .background(Color.Black)
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomEnd)
+                                    .padding(horizontal = 8.dp)
+                                    .fillMaxHeight(fraction = 0.30f) ) {
+                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
+                                        uiState.uri?.let {
+                                            cameraViewModel.sendAndCalculateImage(context, it, scale)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    TypeModel.SEGMENTATION -> Column {
+                        Box(
+                            modifier = Modifier
+                                .background(Color.Black)
+                                .fillMaxWidth()
+                                .fillMaxHeight(fraction = 1f)
+                        ) {
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(fraction = 1f)
+                                    .background(Color.Black)
+                                    .padding(0.dp)
+
+                            ) {
+                                //Inicio da top bar
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopStart),
+                                    onClick = {
+                                        cameraViewModel.handlerEventCameraView(EventUi.DeletandoFoto)
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+                                        Icon(
+                                            imageVector = Icons.Sharp.ArrowBackIosNew,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .align(Alignment.TopEnd),
+                                    onClick = {
+                                        expanded = true
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.DarkGray, CircleShape)
+                                            .padding(4.dp)
+                                    ){
+
+                                        Icon(
+                                            imageVector = Icons.Sharp.MoreHoriz,
+                                            contentDescription = "Take picture",
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .size(32.dp)
+
+                                        )
+                                        DropdownMenu(
+                                            expanded = expanded,
+                                            onDismissRequest = { expanded = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Salvar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.SaveAlt,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                            DropdownMenuItem(
+                                                text = { Text("Desenhar") },
+                                                onClick = {
+                                                    expanded = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Outlined.Draw,
+                                                        contentDescription = null
+                                                    )
+                                                })
+                                        }
+                                    }
+                                }
+
+                                //inicio da imagem
+                                val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                                    Modifier
+                                        .padding(0.dp)
+                                        .fillMaxHeight(fraction = 0.90f)
+                                        .align(Alignment.BottomCenter)
+                                        .graphicsLayer(
+                                            // Aplica o zoom
+                                            scaleX = maxOf(1f, scale),
+                                            scaleY = maxOf(1f, scale)
+                                        )
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, _, zoom, _ ->
+                                                scale *= zoom
+                                            }
+                                        }
+                                } else {
+                                    Modifier
+                                        .padding(0.dp)
+                                        .fillMaxHeight(fraction = 0.90f)
+                                        .align(Alignment.BottomCenter)
+                                        .graphicsLayer(
+                                            // Aplica o zoom
+                                            scaleX = maxOf(1f, scale),
+                                            scaleY = maxOf(1f, scale)
+                                        )
+                                        .pointerInput(Unit) {
+                                            detectTransformGestures { _, _, zoom, _ ->
+                                                scale *= zoom
+                                            }
+                                        }
+                                }
+
+                                Image(
+                                    painter = rememberImagePainter(uiState.uri),
+                                    contentDescription = null,
+                                    modifier = modifer,
+                                    contentScale = ContentScale.Crop,
+
+                                    )
+
+                                Box(  modifier = Modifier
+                                    .background(Color.Black)
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomEnd)
+                                    .padding(horizontal = 8.dp)
+                                    .fillMaxHeight(fraction = 0.40f) ) {
+                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
+                                        uiState.uri?.let {
+                                            cameraViewModel.sendAndCalculateImage(context, it, scale)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
+        }
+
+
+
+
+@Composable
+fun BottomPreview( isLoading : Boolean , uiState: CameraViewUiState, onClick : () -> Unit  ) {
+    Row(modifier = Modifier
+        .fillMaxWidth()
+        .fillMaxHeight()) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp)
+                .fillMaxHeight()
+        ) {
+
+            if(isLoading) {
+                Box(  modifier = Modifier
+                    .height(30.dp)
+                    .width(30.dp)
+                    .align(Alignment.CenterStart) ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                if(uiState.error == null) {
+                    Text("Estou esperando voce aqui", color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
+                } else {
+                    Text(uiState.error.message, color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
+                }
+            }
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(end = 8.dp)
+
+        ) {
+            IconButton(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onClick = onClick
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Sharp.Send,
+                    contentDescription = "Enviar",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
         }
     }
 }

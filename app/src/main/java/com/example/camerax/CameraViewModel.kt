@@ -1,5 +1,6 @@
 package com.example.camerax
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -31,13 +32,25 @@ class CameraViewModel : ViewModel() {
         error = null
     )
 
+    val initPreviewImage = PreviewImage(
+        uriImage = null,
+        typeModel = TypeModel.START,
+        classification =  Classification(score = listOf(Choice(nome = "Cat", rating = 0.92f),
+            Choice(nome = "Dog", rating = 0.80f),  Choice(nome = "Turtle", rating = 0.20f)), modelo = "yollo-v8")
+    )
+
+
     private val _uiState = MutableStateFlow<CameraViewUiState>(initState)
     val uiState : StateFlow<CameraViewUiState> = _uiState.asStateFlow()
+
+    private val _previewImage = MutableStateFlow<PreviewImage>(initPreviewImage)
+    val previewImage : StateFlow<PreviewImage> = _previewImage.asStateFlow()
+
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-
+    //Aplicar na hora de salvar a imagem de self
     fun flipHorizontal(bitmap: Bitmap): Bitmap {
         //flip horizontal image
         val matrix = Matrix()
@@ -48,8 +61,9 @@ class CameraViewModel : ViewModel() {
     fun sendAndCalculateImage(context : Context, uri : Uri, scale: Float) = viewModelScope.launch {
         _isLoading.value = true
         try {
-            val newUri =  applyZoomToBitmap(context, uri, scale)
-            checkBlackOrWhite(context, newUri)
+            //check image is black or white
+            checkBlackOrWhite(context, uri)
+
         }  catch (error : Error) {
             Log.e("CameraViewModel", "Erro de compressao de imagem: ${error.message}", error)
         } finally {
@@ -78,30 +92,42 @@ class CameraViewModel : ViewModel() {
         }
     }
 
+    private fun salvarImagemNaGaleria(context: Context, bitmap: Bitmap, titulo: String): Uri? {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.TITLE, titulo)
+            put(MediaStore.Images.Media.DISPLAY_NAME, titulo)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            // Se for Android Q ou superior
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/${context.getString(R.string.app_name)}")
+            }
+        }
 
-    private fun applyZoomToBitmap(context: Context, originalUri: Uri, scale: Float): Uri {
-           // Carregar o Bitmap original
-           val originalBitmap = if (Build.VERSION.SDK_INT < 28) {
-               MediaStore.Images.Media.getBitmap(context.contentResolver, originalUri)
-           } else {
-               val source = ImageDecoder.createSource(context.contentResolver, originalUri)
-               ImageDecoder.decodeBitmap(source)
-           }
-
-           // Criar um novo Bitmap com zoom aplicado
-           val width = (originalBitmap.width * scale).toInt()
-           val height = (originalBitmap.height * scale).toInt()
-           val scaledBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-            val copyBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-
-           val canvas = Canvas(scaledBitmap)
-           canvas.scale(scale, scale)
-           canvas.drawBitmap(copyBitmap, 0f, 0f, null)
-
-           // Salvar o novo Bitmap em uma URI temporária
-           return saveBitmapToTempUri(context, scaledBitmap)
+        return try {
+            val uri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            context.contentResolver.openOutputStream(uri ?: return null).use { outStream ->
+                if (outStream != null) {
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outStream)
+                }
+            }
+            uri
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Log.e("CameraX", "Error na compresao da imagem ${e.printStackTrace()}", e)
+            null
+        }
     }
+
+
+    //Retornando ao estado de type model start
+    private  fun changeStartState( typeModel : TypeModel ) {
+        _previewImage.update {
+            it -> it.copy(
+                typeModel = typeModel
+            )
+        }
+    }
+
 
     private fun saveBitmapToTempUri(context: Context, bitmap: Bitmap): Uri {
         val tempFile = File(context.cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
@@ -186,13 +212,12 @@ class CameraViewModel : ViewModel() {
                EventUi.DeletandoFoto -> deleteImage()
             is  EventUi.TrocandoCamera -> setCamera()
                EventUi.AtivandoFlesh -> setFlash(value = !_uiState.value.isFlash)
-
+            is EventUi.ChangeStart -> changeStartState(event.typeModel)
         }
     }
 
 
     private fun setCamera() {
-
         if(uiState.value.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
             _uiState.update {
                     currentValeu -> currentValeu.copy(
@@ -249,7 +274,6 @@ class CameraViewModel : ViewModel() {
             current ->  current.copy(
                 uri = null,
                 error = null
-
             )
         }
     }
@@ -264,6 +288,13 @@ data class CameraViewUiState(
     val error : ErrorBackOrWhite?
 )
 
+//adicionar depois mais tipos como segmentacao entre outros
+data class PreviewImage(
+    val typeModel : TypeModel,
+    val classification: Classification?,
+    val uriImage : Uri?
+)
+
 data class ErrorBackOrWhite(
     var message : String,
     var typeError : TypeErrorIsBlackOurWhite
@@ -273,14 +304,18 @@ enum class TypeErrorIsBlackOurWhite {
    ERROIMAGE, NOIMAGE, IMAGEOK
 }
 
+enum class TypeModel {
+    CLASSIFICATION, DETECTION, SEGMENTATION, START
+}
 
 sealed class EventUi {
     data class TirandoFoto( val uri : Uri ) : EventUi()
-
+    data class ChangeStart( val typeModel: TypeModel  ) : EventUi()
     object TrocandoCamera : EventUi()
     object AtivandoFlesh: EventUi()
     object DeletandoFoto :EventUi()
 }
+
 
 
 
