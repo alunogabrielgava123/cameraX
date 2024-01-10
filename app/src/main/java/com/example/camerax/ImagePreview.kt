@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +66,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberImagePainter
 import com.example.camerax.CameraViewModel
 import com.example.camerax.EventUi
+import com.example.camerax.TypeErrorIsBlackOurWhite
 
 
 @Composable
@@ -72,13 +75,14 @@ fun ImagePreview(
 ) {
 
     val uiState = cameraViewModel.uiState.collectAsState().value
+    val isLoading = cameraViewModel.isLoading.collectAsState().value
     var expanded by remember { mutableStateOf(false) }
 
 
     val context = LocalContext.current
 
-    val scale = remember { mutableStateOf(0.92f) }
-    val rotationState = remember { mutableStateOf(0.92f) }
+    var scale by remember { mutableStateOf(1f) }
+
 
 
 
@@ -97,22 +101,40 @@ fun ImagePreview(
 
             val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
                 Modifier
-                    .padding(3.dp)
-                    .fillMaxHeight(fraction = 0.92f)
+                    .padding(0.dp)
+                    .fillMaxHeight(fraction = 1f)
                     .align(Alignment.BottomCenter)
-                    .graphicsLayer(scaleX = -1f)
+                    .graphicsLayer(
+                        // Aplica o zoom
+                        scaleX = maxOf(1f, scale),
+                        scaleY = maxOf(1f, scale)
+                    )
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            scale *= zoom
+                        }
+                    }
             } else {
                 Modifier
-                    .padding(3.dp)
-                    .fillMaxHeight(fraction = 0.92f)
+                    .padding(0.dp)
+                    .fillMaxHeight(fraction = 1f)
                     .align(Alignment.BottomCenter)
+                    .graphicsLayer(
+                        // Aplica o zoom
+                        scaleX = maxOf(1f, scale),
+                        scaleY = maxOf(1f, scale)
+                    )
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            scale *= zoom
+                        }
+                    }
             }
 
                Image(
                    painter = rememberImagePainter(uiState.uri),
                    contentDescription = null,
                    modifier = modifer,
-                   colorFilter = uiState.filtro?.filtroColor,
                    contentScale = ContentScale.Crop,
 
                )
@@ -146,7 +168,6 @@ fun ImagePreview(
                         .padding(12.dp)
                         .align(Alignment.TopEnd),
                     onClick = {
-
                         expanded = true
                     }
                 ) {
@@ -164,7 +185,6 @@ fun ImagePreview(
                                 .size(32.dp)
 
                         )
-
                         DropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
@@ -172,9 +192,7 @@ fun ImagePreview(
                             DropdownMenuItem(
                                 text = { Text("Salvar") },
                                 onClick = {
-                                    cameraViewModel.saveImageMidiaStorage("imagem", context = context, 10f)
-                                    expanded = false
-                                    Toast.makeText(context, "Imagem salva com sucesso!", Toast.LENGTH_SHORT).show()
+                                  expanded = false
                                 },
                                 leadingIcon = {
                                     Icon(
@@ -200,24 +218,58 @@ fun ImagePreview(
                 Box(
                     modifier = Modifier
                         .background(Color.Black)
-                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .align(Alignment.BottomEnd)
+                        .padding(horizontal = 8.dp)
                         .fillMaxHeight(fraction = 0.08f)
                 ) {
-                    Row( modifier = Modifier.align(Alignment.BottomEnd)  ) {
-                        IconButton( onClick = { /*TODO*/ },) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Sharp.Send,
-                                contentDescription = "Take picture",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(32.dp)
+                    Row(modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp)
+                                .fillMaxHeight()
+                        ) {
 
-                            )
+                            if(isLoading) {
+                                Box(  modifier = Modifier.height(30.dp).width(30.dp).align(Alignment.CenterStart) ) {
+                                    CircularProgressIndicator()
+                                }
+                            } else {
+                                if(uiState.error == null) {
+                                    Text("Estou esperando voce aqui", color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
+                                } else {
+                                    Text(uiState.error.message, color = Color.White, modifier = Modifier.align(Alignment.CenterStart))
+                                }
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(end = 8.dp)
+
+                        ) {
+                            IconButton(
+                                modifier = Modifier.align(Alignment.CenterEnd),
+                                onClick = {
+                                    uiState.uri?.let {
+                                        cameraViewModel.sendAndCalculateImage(context, it, scale)
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Sharp.Send,
+                                    contentDescription = "Enviar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
                         }
                     }
-            }
-
+                }
         }
     }
 }
