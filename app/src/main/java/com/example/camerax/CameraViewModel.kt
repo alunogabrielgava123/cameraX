@@ -3,6 +3,7 @@ package com.example.camerax
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
@@ -20,6 +21,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okio.IOException
 import java.io.File
 import java.io.FileOutputStream
 
@@ -34,7 +40,7 @@ class CameraViewModel : ViewModel() {
 
     val initPreviewImage = PreviewImage(
         uriImage = null,
-        typeModel = TypeModel.START,
+        typeModel = TypeModel.CLASSIFICATION,
         classification =  Classification(score = listOf(Choice(nome = "Cat", rating = 0.92f),
             Choice(nome = "Dog", rating = 0.80f),  Choice(nome = "Turtle", rating = 0.20f)), modelo = "yollo-v8")
     )
@@ -45,6 +51,9 @@ class CameraViewModel : ViewModel() {
 
     private val _previewImage = MutableStateFlow<PreviewImage>(initPreviewImage)
     val previewImage : StateFlow<PreviewImage> = _previewImage.asStateFlow()
+
+    private  val _modelsResponse = MutableStateFlow<ModelsResponse>(ModelsResponse.Loading)
+    val modelsResponse : StateFlow<ModelsResponse> = _modelsResponse.asStateFlow()
 
 
     private val _isLoading = MutableStateFlow(false)
@@ -58,11 +67,41 @@ class CameraViewModel : ViewModel() {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
+
+    init {
+        getModels()
+    }
+
+
+
+    private  fun getModels() = viewModelScope.launch {
+        try {
+            val listModels = HttpService.api.getModels()
+            _modelsResponse.value = ModelsResponse.Successes(listModels.models)
+        } catch (e : IOException) {
+            _modelsResponse.value = ModelsResponse.Error
+            Log.e("CameraX", "Erro ${e.printStackTrace()}", e)
+        }
+
+    }
+
+    private  fun bodyMultiPart(file : File): MultipartBody.Part {
+        val requestFile = RequestBody.create("image/png".toMediaTypeOrNull(), file)
+        val body = MultipartBody.Part.createFormData("imagem", file.name, requestFile)
+        return body
+    }
+
+
     fun sendAndCalculateImage(context : Context, uri : Uri, scale: Float) = viewModelScope.launch {
         _isLoading.value = true
         try {
             //check image is black or white
             checkBlackOrWhite(context, uri)
+            val file = imageUriToPng(context, uri)
+            val body = bodyMultiPart(file)
+
+            //TODO DO
+
 
         }  catch (error : Error) {
             Log.e("CameraViewModel", "Erro de compressao de imagem: ${error.message}", error)
@@ -70,6 +109,23 @@ class CameraViewModel : ViewModel() {
             _isLoading.value = false
         }
     }
+
+    suspend fun imageUriToPng(context: Context, uri: Uri): File {
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+        inputStream?.close()
+
+        val file = File(context.filesDir, "imagem.png")
+        val fos = FileOutputStream(file)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+        fos.close()
+
+        return file
+    }
+
+
+
+
 
     private suspend  fun checkBlackOrWhite(context: Context, uri: Uri?) = withContext(Dispatchers.Default) {
         try {
@@ -92,31 +148,6 @@ class CameraViewModel : ViewModel() {
         }
     }
 
-    private fun salvarImagemNaGaleria(context: Context, bitmap: Bitmap, titulo: String): Uri? {
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.TITLE, titulo)
-            put(MediaStore.Images.Media.DISPLAY_NAME, titulo)
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            // Se for Android Q ou superior
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/${context.getString(R.string.app_name)}")
-            }
-        }
-
-        return try {
-            val uri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            context.contentResolver.openOutputStream(uri ?: return null).use { outStream ->
-                if (outStream != null) {
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outStream)
-                }
-            }
-            uri
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Log.e("CameraX", "Error na compresao da imagem ${e.printStackTrace()}", e)
-            null
-        }
-    }
 
 
     //Retornando ao estado de type model start
@@ -279,6 +310,12 @@ class CameraViewModel : ViewModel() {
     }
 }
 
+
+sealed interface ModelsResponse {
+    data class Successes(val models :  List<String>  ) : ModelsResponse
+    object Error : ModelsResponse
+    object  Loading : ModelsResponse
+}
 
 
 data class CameraViewUiState(

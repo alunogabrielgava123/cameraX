@@ -77,6 +77,14 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.0.1")
     implementation("androidx.camera:camera-view:1.0.0-alpha27")
 
+
+    //retrofit
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0") // Retrofit
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0") // Gson converter
+    implementation ("com.squareup.okhttp3:logging-interceptor:4.9.0") // OkHttp Logging Interceptor (opcional para logs)
+
+
+
     //icon
 //    implementation("androidx.compose.material:material-icons-extended:1.7.2")
 

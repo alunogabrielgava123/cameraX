@@ -86,7 +86,6 @@ fun ImagePreview(
     val context = LocalContext.current
 
     var scale by remember { mutableStateOf(1f) }
-
                 when (imagePreview.typeModel) {
                     TypeModel.START -> Column {
                         Box(
