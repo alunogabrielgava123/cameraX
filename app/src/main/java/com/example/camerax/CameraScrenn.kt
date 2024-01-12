@@ -17,13 +17,11 @@ fun  CameraScream(
     executor: Executor,
 ) {
     val cameraViewModel : CameraViewModel = viewModel()
-    val uiState = cameraViewModel.uiState.collectAsState().value
+    val previewImage = cameraViewModel.previewImage.collectAsState().value
 
-    if(uiState.uri != null) {
-        ImagePreview()
+    if(previewImage.uriImage != null) {
+       ImagePreview()
     } else {
         CameraView(outputDirectory =outputDirectory ,executor = executor)
     }
-
-
 }

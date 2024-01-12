@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -12,8 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,6 +68,7 @@ fun CameraView(
     val systemUiController = rememberSystemUiController()
     val useDarkIcons = !isSystemInDarkTheme()
     val modelsState = viewModelCameraView.modelsResponse.collectAsState().value
+    val uploadImage = viewModelCameraView.requestUploadImage.collectAsState().value
 
 
     DisposableEffect(systemUiController, useDarkIcons) {
@@ -167,6 +171,18 @@ fun CameraView(
 
         AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
 
+        if(uploadImage == UploadImage.Loading) {
+            Box(modifier = Modifier
+                .align(Alignment.Center)
+                .width(45.dp)
+                .height(45.dp)
+                .background(Color.Black, shape = RoundedCornerShape(4.dp))) {
+                CircularProgressIndicator(modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(8.dp),  color = Color.White)
+            }
+        }
+
         IconButton(modifier = Modifier
             .align(Alignment.TopStart)
             .size(80.dp),
@@ -227,7 +243,7 @@ fun CameraView(
                     executor = executor,
                     onError = {},
                     onImageCaptured = { uri ->
-                        viewModelCameraView.handlerEventCameraView(EventUi.TirandoFoto(uri = uri))
+                        viewModelCameraView.handlerEventCameraView(EventUi.TirandoFoto(context,uri = uri))
                     })
             },
 
@@ -248,7 +264,6 @@ fun CameraView(
         ) {
             ButtonModels(model = modelsState)
         }
-
 
     }
 }
@@ -277,7 +292,12 @@ fun ButtonModels(model: ModelsResponse) {
             onClick = {},
             enabled = false,
         ) {
-
+            Icon(
+                imageVector = Icons.Sharp.MoreHoriz,
+                contentDescription = "Take picture",
+                tint = Color.Gray,
+                modifier = Modifier.size(32.dp)
+            )
         }
     }
 

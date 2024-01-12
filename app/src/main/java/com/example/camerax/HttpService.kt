@@ -4,6 +4,7 @@ import okhttp3.MultipartBody
 import retrofit2.Call
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
@@ -17,13 +18,33 @@ interface  ApiService {
     @Multipart
     @POST("upload")
     suspend fun uploadImage(@Part image : MultipartBody.Part) : UploadResponse
+    @POST("response")
+    suspend fun ResponseClassification(@Body request : RequestClassification) : RespoenseClassification
 }
+
+
+data class RequestClassification(
+    val model : String,
+    val image_name : String
+)
+
+data class RespoenseClassification(
+    val statistics : List<Choice>,
+    val model : String
+)
+
+data class Choice(
+    val number : Int,
+    val classification : String,
+    val percentage : Float
+)
+
 
 data class Models(
     val models: List<String>
 )
 data class UploadResponse(
-    val model : String,
+    val message : String,
     val image_name : String
 )
 

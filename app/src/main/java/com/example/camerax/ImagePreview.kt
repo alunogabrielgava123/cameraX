@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,9 +69,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberImagePainter
 import com.example.camerax.CameraViewModel
 import com.example.camerax.CameraViewUiState
+import com.example.camerax.Choice
 import com.example.camerax.EventUi
 import com.example.camerax.TypeErrorIsBlackOurWhite
 import com.example.camerax.TypeModel
+import org.intellij.lang.annotations.JdkConstants.HorizontalAlignment
+import kotlin.math.roundToInt
 
 
 @Composable
@@ -79,7 +83,6 @@ fun ImagePreview(
 ) {
 
     val uiState = cameraViewModel.uiState.collectAsState().value
-    val isLoading = cameraViewModel.isLoading.collectAsState().value
     var expanded by remember { mutableStateOf(false) }
     val imagePreview = cameraViewModel.previewImage.collectAsState().value
 
@@ -227,11 +230,7 @@ fun ImagePreview(
                                     .align(Alignment.BottomEnd)
                                     .padding(horizontal = 8.dp)
                                     .fillMaxHeight(fraction = 0.10f) ) {
-                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
-                                        uiState.uri?.let {
-                                            cameraViewModel.handlerEventCameraView(EventUi.ChangeStart(TypeModel.CLASSIFICATION))
-                                        }
-                                    }
+
                                 }
                         }
                         }
@@ -277,30 +276,6 @@ fun ImagePreview(
                                  }
                              }
 
-                             IconButton(
-                                 modifier = Modifier
-                                     .padding(12.dp)
-                                     .align(Alignment.TopEnd),
-                                 onClick = {
-                                     cameraViewModel.handlerEventCameraView(EventUi.ChangeStart( typeModel = TypeModel.START ))
-                                 }
-                             ) {
-                                 Box(
-                                     modifier = Modifier
-                                         .background(Color.DarkGray, CircleShape)
-                                         .padding(4.dp)
-                                 ){
-
-                                     Icon(
-                                         imageVector = Icons.Sharp.Clear,
-                                         contentDescription = "Take picture",
-                                         tint = Color.White,
-                                         modifier = Modifier
-                                             .size(32.dp)
-
-                                     )
-                                 }
-                             }
 
                              //inicio da imagem
                              val modifer = if(uiState.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
@@ -336,7 +311,7 @@ fun ImagePreview(
                              }
 
                              Image(
-                                 painter = rememberImagePainter(uiState.uri),
+                                 painter = rememberImagePainter(imagePreview.uriImage),
                                  contentDescription = null,
                                  modifier = modifer,
                                  contentScale = ContentScale.Crop,
@@ -350,16 +325,15 @@ fun ImagePreview(
                                  .padding(horizontal = 8.dp)
                                  .fillMaxHeight(fraction = 0.30f) )
                              {
-                                 Box(modifier = Modifier.fillMaxWidth(0.4f).fillMaxHeight().padding(8.dp).align(alignment = Alignment.CenterStart)) {
+                                 Box(modifier = Modifier
+                                     .fillMaxWidth(1f)
+                                     .fillMaxHeight()
+                                     .padding(8.dp)
+                                     .align(alignment = Alignment.CenterStart)) {
                                      Column {
-                                         imagePreview.classification?.score?.forEach {
-                                                 choice -> Row(
-                                                modifier = Modifier.background(Color.Red)
-                                         ) {
-                                             Text(choice.nome, color =Color.White)
-                                             Text("${choice.rating * 100}%", color = Color.White)
-                                         }
-                                         }
+                                        imagePreview.choices.forEach {
+                                            choice -> Choice(choice = choice)
+                                        }
                                      }
                                  }
                              }
@@ -506,11 +480,7 @@ fun ImagePreview(
                                     .align(Alignment.BottomEnd)
                                     .padding(horizontal = 8.dp)
                                     .fillMaxHeight(fraction = 0.30f) ) {
-                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
-                                        uiState.uri?.let {
-                                            cameraViewModel.sendAndCalculateImage(context, it, scale)
-                                        }
-                                    }
+
                                 }
                             }
                         }
@@ -655,11 +625,7 @@ fun ImagePreview(
                                     .align(Alignment.BottomEnd)
                                     .padding(horizontal = 8.dp)
                                     .fillMaxHeight(fraction = 0.40f) ) {
-                                    BottomPreview(isLoading =isLoading , uiState =uiState ) {
-                                        uiState.uri?.let {
-                                            cameraViewModel.sendAndCalculateImage(context, it, scale)
-                                        }
-                                    }
+
                                 }
                             }
                         }
@@ -668,6 +634,13 @@ fun ImagePreview(
         }
 
 
+@Composable
+fun Choice(choice : Choice ) {
+    Row( modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Text(choice.classification, color = Color.White)
+        Text("${choice.percentage.roundToInt()}%", color = Color.White)
+    }
+}
 
 
 @Composable

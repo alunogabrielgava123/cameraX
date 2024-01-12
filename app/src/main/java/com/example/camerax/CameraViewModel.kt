@@ -25,9 +25,14 @@ import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okio.BufferedSink
 import okio.IOException
+import okio.source
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 
 class CameraViewModel : ViewModel() {
 
@@ -41,23 +46,22 @@ class CameraViewModel : ViewModel() {
     val initPreviewImage = PreviewImage(
         uriImage = null,
         typeModel = TypeModel.CLASSIFICATION,
-        classification =  Classification(score = listOf(Choice(nome = "Cat", rating = 0.92f),
-            Choice(nome = "Dog", rating = 0.80f),  Choice(nome = "Turtle", rating = 0.20f)), modelo = "yollo-v8")
+        choices = listOf()
     )
+
+    private val _requestUploadImage = MutableStateFlow<UploadImage>(UploadImage.AwaitRequest)
+    val requestUploadImage: StateFlow<UploadImage> = _requestUploadImage.asStateFlow()
 
 
     private val _uiState = MutableStateFlow<CameraViewUiState>(initState)
-    val uiState : StateFlow<CameraViewUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<CameraViewUiState> = _uiState.asStateFlow()
 
     private val _previewImage = MutableStateFlow<PreviewImage>(initPreviewImage)
-    val previewImage : StateFlow<PreviewImage> = _previewImage.asStateFlow()
+    val previewImage: StateFlow<PreviewImage> = _previewImage.asStateFlow()
 
-    private  val _modelsResponse = MutableStateFlow<ModelsResponse>(ModelsResponse.Loading)
-    val modelsResponse : StateFlow<ModelsResponse> = _modelsResponse.asStateFlow()
+    private val _modelsResponse = MutableStateFlow<ModelsResponse>(ModelsResponse.Loading)
+    val modelsResponse: StateFlow<ModelsResponse> = _modelsResponse.asStateFlow()
 
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     //Aplicar na hora de salvar a imagem de self
     fun flipHorizontal(bitmap: Bitmap): Bitmap {
@@ -73,87 +77,137 @@ class CameraViewModel : ViewModel() {
     }
 
 
-
-    private  fun getModels() = viewModelScope.launch {
+    private fun getModels() = viewModelScope.launch {
         try {
             val listModels = HttpService.api.getModels()
             _modelsResponse.value = ModelsResponse.Successes(listModels.models)
-        } catch (e : IOException) {
+        } catch (e: IOException) {
             _modelsResponse.value = ModelsResponse.Error
             Log.e("CameraX", "Erro ${e.printStackTrace()}", e)
         }
 
     }
 
-    private  fun bodyMultiPart(file : File): MultipartBody.Part {
-        val requestFile = RequestBody.create("image/png".toMediaTypeOrNull(), file)
-        val body = MultipartBody.Part.createFormData("imagem", file.name, requestFile)
-        return body
+    suspend fun prepareFilePart(
+        partName: String,
+        fileUri: Uri,
+        context: Context
+    ): MultipartBody.Part? = withContext(Dispatchers.IO) {
+        val file = createTempFileFromUri(fileUri, context) ?: return@withContext null
+
+
+        val requestFile = RequestBody.create(
+            "image/*".toMediaTypeOrNull(),
+            file
+        )
+
+        // Use a extensão correta no nome do arquivo
+        val fileName = "image.${file.extension}"
+
+        MultipartBody.Part.createFormData(partName, fileName, requestFile)
     }
 
 
-    fun sendAndCalculateImage(context : Context, uri : Uri, scale: Float) = viewModelScope.launch {
-        _isLoading.value = true
+    fun createTempFileFromUri(fileUri: Uri, context: Context): File? {
+        val inputStream: InputStream? = context.contentResolver.openInputStream(fileUri)
+        inputStream ?: return null
+
+        val tempFile = File.createTempFile("upload", ".png", context.cacheDir)
+        tempFile.deleteOnExit()
+
+        FileOutputStream(tempFile).use { fileOut ->
+            inputStream.copyTo(fileOut)
+        }
+
+        return tempFile
+    }
+
+
+    fun sendAndCalculateImage(context: Context, uri: Uri) = viewModelScope.launch {
+        _requestUploadImage.value = UploadImage.Loading
         try {
             //check image is black or white
-            checkBlackOrWhite(context, uri)
-            val file = imageUriToPng(context, uri)
-            val body = bodyMultiPart(file)
+            //checkBlackOrWhite(context, uri)
 
-            //TODO DO
+            val filePart = prepareFilePart("file", uri, context)
 
+            val resposta = filePart?.let {
+                HttpService.api.uploadImage(it)
+            }
 
-        }  catch (error : Error) {
-            Log.e("CameraViewModel", "Erro de compressao de imagem: ${error.message}", error)
+            if (resposta != null) {
+                val responseClassificacao = HttpService.api.ResponseClassification(
+                    RequestClassification(
+                        model = "microsoft/resnet-50",
+                        image_name = resposta.image_name
+                    )
+                )
+                updateImagePreview(PreviewImage(choices = responseClassificacao.statistics, typeModel = TypeModel.CLASSIFICATION, uriImage = uri))
+            }
+            if (resposta != null) {
+                _requestUploadImage.value = UploadImage.Successes(resposta.message)
+            }
+
+        } catch (error: IOException) {
+            Log.e("CameraViewModel", "Erro no envio da imagem: ${error.message}", error)
+            _requestUploadImage.value = UploadImage.Error
         } finally {
-            _isLoading.value = false
+            _requestUploadImage.value = UploadImage.AwaitRequest
         }
     }
 
-    suspend fun imageUriToPng(context: Context, uri: Uri): File {
-        val inputStream = context.contentResolver.openInputStream(uri)
-        val bitmap = BitmapFactory.decodeStream(inputStream)
-        inputStream?.close()
 
-        val file = File(context.filesDir, "imagem.png")
-        val fos = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
-        fos.close()
+    private suspend fun checkBlackOrWhite(context: Context, uri: Uri?) =
+        withContext(Dispatchers.Default) {
+            try {
+                if (uri == null) {
+                    checkAndUpdateWhiteOurBlack(
+                        ErrorBackOrWhite(
+                            "Sem imagem",
+                            typeError = TypeErrorIsBlackOurWhite.NOIMAGE
+                        )
+                    )
+                    return@withContext
+                }
 
-        return file
-    }
-
-
-
-
-
-    private suspend  fun checkBlackOrWhite(context: Context, uri: Uri?) = withContext(Dispatchers.Default) {
-        try {
-            if (uri == null) {
-                checkAndUpdateWhiteOurBlack(ErrorBackOrWhite("Sem imagem", typeError = TypeErrorIsBlackOurWhite.NOIMAGE))
-                return@withContext
+                val isBlackOrWhite = isImageAllBlack(context, uri)
+                val isWhite = isImageAllWhite(context, uri)
+                if (isBlackOrWhite || isWhite) {
+                    checkAndUpdateWhiteOurBlack(
+                        ErrorBackOrWhite(
+                            message = "Imagem não pode ser detectada",
+                            typeError = TypeErrorIsBlackOurWhite.ERROIMAGE
+                        )
+                    )
+                } else {
+                    checkAndUpdateWhiteOurBlack(
+                        ErrorBackOrWhite(
+                            message = "Imagem enviada com sucesso",
+                            typeError = TypeErrorIsBlackOurWhite.IMAGEOK
+                        )
+                    )
+                }
+            } catch (exception: Exception) {
+                Log.e(
+                    "CameraViewModel",
+                    "Erro ao verificar brilho da imagem: ${exception.message}",
+                    exception
+                )
+                // Atualizar o estado de erro, se necessário
+                checkAndUpdateWhiteOurBlack(
+                    ErrorBackOrWhite(
+                        "Error inesperado na hora de verificar a imagem",
+                        typeError = TypeErrorIsBlackOurWhite.ERROIMAGE
+                    )
+                )
             }
-
-            val isBlackOrWhite = isImageAllBlack(context, uri)
-            val isWhite = isImageAllWhite(context, uri)
-            if (isBlackOrWhite || isWhite) {
-                checkAndUpdateWhiteOurBlack(ErrorBackOrWhite(message = "Imagem não pode ser detectada", typeError = TypeErrorIsBlackOurWhite.ERROIMAGE))
-            } else {
-                checkAndUpdateWhiteOurBlack(ErrorBackOrWhite(message = "Imagem enviada com sucesso", typeError = TypeErrorIsBlackOurWhite.IMAGEOK))
-            }
-        } catch (exception: Exception) {
-            Log.e("CameraViewModel", "Erro ao verificar brilho da imagem: ${exception.message}", exception)
-            // Atualizar o estado de erro, se necessário
-            checkAndUpdateWhiteOurBlack( ErrorBackOrWhite("Error inesperado na hora de verificar a imagem", typeError = TypeErrorIsBlackOurWhite.ERROIMAGE)  )
         }
-    }
-
 
 
     //Retornando ao estado de type model start
-    private  fun changeStartState( typeModel : TypeModel ) {
-        _previewImage.update {
-            it -> it.copy(
+    private fun changeStartState(typeModel: TypeModel) {
+        _previewImage.update { it ->
+            it.copy(
                 typeModel = typeModel
             )
         }
@@ -226,7 +280,6 @@ class CameraViewModel : ViewModel() {
     }
 
 
-
     private fun calculateLuminance(color: Int): Double {
         val red = (color shr 16 and 0xff) / 255.0
         val green = (color shr 8 and 0xff) / 255.0
@@ -237,46 +290,59 @@ class CameraViewModel : ViewModel() {
     }
 
 
-    fun handlerEventCameraView(event : EventUi) {
-        when(event) {
-            is EventUi.TirandoFoto -> saveUiState(event.uri)
-               EventUi.DeletandoFoto -> deleteImage()
-            is  EventUi.TrocandoCamera -> setCamera()
-               EventUi.AtivandoFlesh -> setFlash(value = !_uiState.value.isFlash)
+    fun handlerEventCameraView(event: EventUi) {
+        when (event) {
+            is EventUi.TirandoFoto -> sendAndCalculateImage(
+                context = event.context,
+                uri = event.uri
+            )
+
+            EventUi.DeletandoFoto -> deleteImage()
+            is EventUi.TrocandoCamera -> setCamera()
+            EventUi.AtivandoFlesh -> setFlash(value = !_uiState.value.isFlash)
             is EventUi.ChangeStart -> changeStartState(event.typeModel)
         }
     }
 
 
     private fun setCamera() {
-        if(uiState.value.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
-            _uiState.update {
-                    currentValeu -> currentValeu.copy(
-                isFront = CameraSelector.DEFAULT_BACK_CAMERA
-            )
+        if (uiState.value.isFront == CameraSelector.DEFAULT_FRONT_CAMERA) {
+            _uiState.update { currentValeu ->
+                currentValeu.copy(
+                    isFront = CameraSelector.DEFAULT_BACK_CAMERA
+                )
             }
         } else {
-            _uiState.update {
-                    currentValeu -> currentValeu.copy(
-                isFront = CameraSelector.DEFAULT_FRONT_CAMERA
-             )
+            _uiState.update { currentValeu ->
+                currentValeu.copy(
+                    isFront = CameraSelector.DEFAULT_FRONT_CAMERA
+                )
             }
         }
     }
 
-    private  fun checkAndUpdateWhiteOurBlack( error : ErrorBackOrWhite ) {
+    private fun checkAndUpdateWhiteOurBlack(error: ErrorBackOrWhite) {
         _uiState.update { currentState -> currentState.copy(error = error) }
     }
 
-    private fun setFlash(value : Boolean) {
-        _uiState.update {
-                currentValeu -> currentValeu.copy(
-            isFlash = value
-        )
+    private fun setFlash(value: Boolean) {
+        _uiState.update { currentValeu ->
+            currentValeu.copy(
+                isFlash = value
+            )
         }
     }
 
-    private suspend  fun getBitmapFromUri(uri: Uri, context: Context): Bitmap? {
+    private fun updateImagePreview(imagePreviewImage: PreviewImage) {
+        _previewImage.update { currentImagePreview ->
+            currentImagePreview.copy(
+                uriImage = imagePreviewImage.uriImage,
+                choices = imagePreviewImage.choices
+            )
+        }
+    }
+
+    private suspend fun getBitmapFromUri(uri: Uri, context: Context): Bitmap? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val source = ImageDecoder.createSource(context.contentResolver, uri)
             ImageDecoder.decodeBitmap(source)
@@ -285,7 +351,6 @@ class CameraViewModel : ViewModel() {
             MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
         }
     }
-
 
 
     //save ui State;
@@ -300,21 +365,29 @@ class CameraViewModel : ViewModel() {
 
 
     //deletando imagem;
-    private  fun deleteImage() {
-        _uiState.update {
-            current ->  current.copy(
-                uri = null,
-                error = null
+    private fun deleteImage() {
+        _previewImage.update { current ->
+            current.copy(
+                uriImage = null,
+                choices = listOf()
             )
         }
     }
 }
 
 
+sealed interface UploadImage {
+    object AwaitRequest : UploadImage
+    data class Successes(val message: String) : UploadImage
+    object Error : UploadImage
+    object Loading : UploadImage
+}
+
+
 sealed interface ModelsResponse {
-    data class Successes(val models :  List<String>  ) : ModelsResponse
+    data class Successes(val models: List<String>) : ModelsResponse
     object Error : ModelsResponse
-    object  Loading : ModelsResponse
+    object Loading : ModelsResponse
 }
 
 
@@ -322,23 +395,23 @@ data class CameraViewUiState(
     val uri: Uri?,
     val isFront: CameraSelector,
     val isFlash: Boolean,
-    val error : ErrorBackOrWhite?
+    val error: ErrorBackOrWhite?
 )
 
 //adicionar depois mais tipos como segmentacao entre outros
 data class PreviewImage(
-    val typeModel : TypeModel,
-    val classification: Classification?,
-    val uriImage : Uri?
+    val typeModel: TypeModel,
+    val choices: List<Choice>,
+    val uriImage: Uri?
 )
 
 data class ErrorBackOrWhite(
-    var message : String,
-    var typeError : TypeErrorIsBlackOurWhite
+    var message: String,
+    var typeError: TypeErrorIsBlackOurWhite
 )
 
 enum class TypeErrorIsBlackOurWhite {
-   ERROIMAGE, NOIMAGE, IMAGEOK
+    ERROIMAGE, NOIMAGE, IMAGEOK
 }
 
 enum class TypeModel {
@@ -346,11 +419,11 @@ enum class TypeModel {
 }
 
 sealed class EventUi {
-    data class TirandoFoto( val uri : Uri ) : EventUi()
-    data class ChangeStart( val typeModel: TypeModel  ) : EventUi()
+    data class TirandoFoto(val context: Context, val uri: Uri) : EventUi()
+    data class ChangeStart(val typeModel: TypeModel) : EventUi()
     object TrocandoCamera : EventUi()
-    object AtivandoFlesh: EventUi()
-    object DeletandoFoto :EventUi()
+    object AtivandoFlesh : EventUi()
+    object DeletandoFoto : EventUi()
 }
 
 
