@@ -138,11 +138,12 @@ class CameraViewModel : ViewModel() {
             if (resposta != null) {
                 val responseClassificacao = HttpService.api.ResponseClassification(
                     RequestClassification(
-                        model = "microsoft/resnet-50",
+                        model = _previewImage.value.model,
                         image_name = resposta.image_name
                     )
                 )
                 updateImagePreview(PreviewImage(choices = responseClassificacao.statistics, typeModel = TypeModel.CLASSIFICATION, uriImage = uri))
+                Log.i("CameraViewModel", "Erro no envio da imagem: ${responseClassificacao.model}")
             }
             if (resposta != null) {
                 _requestUploadImage.value = UploadImage.Successes(resposta.message)
@@ -301,6 +302,15 @@ class CameraViewModel : ViewModel() {
             is EventUi.TrocandoCamera -> setCamera()
             EventUi.AtivandoFlesh -> setFlash(value = !_uiState.value.isFlash)
             is EventUi.ChangeStart -> changeStartState(event.typeModel)
+            is EventUi.MudandoModel -> MudandoModel(event.model)
+        }
+    }
+
+    fun MudandoModel(model : String) {
+        _previewImage.update {
+            previewImage -> previewImage.copy(
+                 model = model
+            )
         }
     }
 
@@ -402,7 +412,8 @@ data class CameraViewUiState(
 data class PreviewImage(
     val typeModel: TypeModel,
     val choices: List<Choice>,
-    val uriImage: Uri?
+    val uriImage: Uri?,
+    val model : String = "microsoft/resnet-50"
 )
 
 data class ErrorBackOrWhite(
@@ -419,6 +430,7 @@ enum class TypeModel {
 }
 
 sealed class EventUi {
+    data class MudandoModel(val model : String ) : EventUi()
     data class TirandoFoto(val context: Context, val uri: Uri) : EventUi()
     data class ChangeStart(val typeModel: TypeModel) : EventUi()
     object TrocandoCamera : EventUi()

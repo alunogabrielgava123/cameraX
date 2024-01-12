@@ -262,14 +262,14 @@ fun CameraView(
         Box(
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            ButtonModels(model = modelsState)
+            ButtonModels(model = modelsState, viewModelCameraView)
         }
 
     }
 }
 
 @Composable
-fun ButtonModels(model: ModelsResponse) {
+fun ButtonModels(model: ModelsResponse, viewModel: CameraViewModel) {
 
     var expanded by remember { mutableStateOf(false) }
 
@@ -280,6 +280,8 @@ fun ButtonModels(model: ModelsResponse) {
             onDismissRequest = { expanded = false },
             expanded = expanded,
             select = {
+                //mudando o modelo
+                viewModel.handlerEventCameraView(EventUi.MudandoModel(it))
                 expanded = false
             }
         )
@@ -309,7 +311,7 @@ fun DropDown(
     onClick: () -> Unit,
     onDismissRequest: () -> Unit,
     expanded: Boolean,
-    select: () -> Unit
+    select: (model : String) -> Unit
 ) {
     IconButton(
         modifier = Modifier
@@ -325,7 +327,7 @@ fun DropDown(
         )
         DropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
             models.forEach { model ->
-                DropdownMenuItem(text = { Text(model) }, onClick = select, leadingIcon = {
+                DropdownMenuItem(text = { Text(model) }, onClick = { select(model) }, leadingIcon = {
                     Icon(
                         Icons.Outlined.SaveAlt, contentDescription = null
                     )
